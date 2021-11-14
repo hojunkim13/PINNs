@@ -1,40 +1,43 @@
 import torch
-from Solve import PINN, ub, lb
+from solve import PINN, x_min, x_max, t_min, t_max
 import numpy as np
 import matplotlib.pyplot as plt
-from numpy.lib.function_base import meshgrid
-from celluloid import Camera
+from matplotlib.animation import FuncAnimation
 
-device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 pinn = PINN()
 pinn.net.load_state_dict(torch.load("./Wave/1D/weight.pt"))
 
-x = np.arange(lb["x"], ub["x"], 0.01)
-t = np.arange(lb["t"], ub["t"], 0.01)
+x = np.arange(x_min, x_max, 0.01)
+t = np.arange(t_min, t_max, 0.01)
 
-x_, t_ = meshgrid(x, t)
+x_mesh, t_mesh = np.meshgrid(x, t)
 
-x_ = x_.reshape((-1, 1))
-t_ = t_.reshape((-1, 1))
+x_ = x_mesh.reshape((-1, 1))
+t_ = t_mesh.reshape((-1, 1))
 
-x_ = torch.tensor(x_, dtype=torch.float64).to(device)
-t_ = torch.tensor(t_, dtype=torch.float64).to(device)
+x_ts = torch.tensor(x_, dtype=torch.float32).to(device)
+t_ts = torch.tensor(t_, dtype=torch.float32).to(device)
+xt_ts = torch.hstack([x_ts, t_ts])
 with torch.no_grad():
-    u_pred = pinn.net(x_, t_).cpu().numpy().reshape((len(t), len(x))).T
+    u_pred = pinn.net(xt_ts).cpu().numpy().reshape(t_mesh.shape).T
 
-print("")
+
 fig, ax = plt.subplots()
-cam = Camera(fig)
 ax.set_xlabel("$x$")
 ax.set_xlabel("$u$")
+ax.set_xlim([x_min - 0.1, x_max + 0.1])
+ax.set_ylim([u_pred.min() - 0.1, u_pred.max() + 0.1])
+(line,) = ax.plot([], [], color="k")
+text = ax.text(0.40, 1.01, "", transform=ax.transAxes)
 
 
-for i in range(len(t)):
-    ax.plot(x, u_pred[:, i], color="black")
-    ax.text(0.40, 1.01, f"$t\ =\ {t[i]:.2f}\ [sec]$", transform=ax.transAxes)
+def update(frame):
+    # ax.plot(x, u_pred[:, frame], color="k")
+    line.set_data(x, u_pred[:, frame])
+    text.set_text(f"$t\ =\ {t[frame]:.2f}\ [sec]$")
 
-    cam.snap()
 
-ani = cam.animate(50, blit=True)
-ani.save("./Wave/1D/solution.gif")
+ani = FuncAnimation(fig, update, frames=len(t), interval=50)
+ani.save("./Wave/1D/solution.gif", dpi=300)

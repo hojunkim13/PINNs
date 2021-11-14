@@ -1,16 +1,18 @@
 import sys
 
-sys.path.insert(0, "./Burgers")
+sys.path.append(".")
 import numpy as np
 import torch
 from torch.autograd import grad, Variable
-from Network import DNN
+from network import DNN
 from scipy.io import loadmat
 
-
+torch.manual_seed(1234)
 np.random.seed(1234)
-torch.set_default_dtype(torch.float64)
+torch.backends.cuda.matmul.allow_tf32 = False
+
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 
 """
 Burgers Eqn.
@@ -33,14 +35,14 @@ u_ = u.reshape(-1, 1)
 
 rand_idx = np.random.choice(len(u_), N_u, replace=False)
 
-x = torch.tensor(x_[rand_idx], dtype=torch.float64).to(device)
-t = torch.tensor(t_[rand_idx], dtype=torch.float64).to(device)
-u = torch.tensor(u_[rand_idx], dtype=torch.float64).to(device)
+x = torch.tensor(x_[rand_idx], dtype=torch.float32).to(device)
+t = torch.tensor(t_[rand_idx], dtype=torch.float32).to(device)
+u = torch.tensor(u_[rand_idx], dtype=torch.float32).to(device)
 
 # 1% Noisy Data Preparation
 noise = 0.01
 noisy_u = u_ + noise * np.std(u_) * np.random.randn(*u_.shape)
-noisy_u = torch.tensor(noisy_u[rand_idx], dtype=torch.float64).to(device)
+noisy_u = torch.tensor(noisy_u[rand_idx], dtype=torch.float32).to(device)
 
 
 class PINN:
@@ -50,7 +52,9 @@ class PINN:
         self.lambda_2 = torch.tensor([-6.0], requires_grad=True).to(device)
         self.lambda_1 = torch.nn.Parameter(self.lambda_1)
         self.lambda_2 = torch.nn.Parameter(self.lambda_2)
-        self.net = DNN().to(device)
+        self.net = DNN(
+            dim_in=2, dim_out=1, n_layer=7, n_node=20, activation=torch.nn.Tanh()
+        ).to(device)
         self.net.register_parameter("lambda_1", self.lambda_1)
         self.net.register_parameter("lambda_2", self.lambda_2)
 
@@ -62,7 +66,7 @@ class PINN:
             history_size=50,
             tolerance_grad=1e-5,
             tolerance_change=1.0 * np.finfo(float).eps,
-            line_search_fn="strong_wolfe",  # can be "strong_wolfe"
+            line_search_fn="strong_wolfe",
         )
         self.iter = 0
 
@@ -113,7 +117,7 @@ def calcError(pinn):
     error_lambda1 = np.abs(lambda1 - 1.0) * 100
     error_lambda2 = np.abs(lambda2 - 0.01 / np.pi) * 100
     print(
-        f"Error u  : {error_u:.5e}",
+        f"\nError u  : {error_u:.5e}",
         f"\nError l1 : {error_lambda1:.5f}%",
         f"\nError l2 : {error_lambda2:.5f}%",
     )
@@ -123,11 +127,11 @@ def calcError(pinn):
 if __name__ == "__main__":
     pinn = PINN(u)
     pinn.optimizer.step(pinn.closure)
-    torch.save(pinn.net.state_dict(), "./Burgers/Burgers_identification/weight_0.pt")
-    pinn.net.load_state_dict(torch.load("./Burgers/Burgers_identification/weight_0.pt"))
+    torch.save(pinn.net.state_dict(), "./Burgers/Identification/weight_clean.pt")
+    pinn.net.load_state_dict(torch.load("./Burgers/Identification/weight_clean.pt"))
     calcError(pinn)
 
     pinn = PINN(noisy_u)
     pinn.optimizer.step(pinn.closure)
-    torch.save(pinn.net.state_dict(), "./Burgers/Burgers_identification/weight_1.pt")
+    torch.save(pinn.net.state_dict(), "./Burgers/identification/weight_noisy1.pt")
     calcError(pinn)

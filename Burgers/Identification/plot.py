@@ -1,8 +1,8 @@
 import sys
 
-sys.path.insert(0, "./Burgers")
+sys.path.append("./Burgers/Identification")
 import torch
-from Burgers import PINN
+from main import PINN
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -43,9 +43,9 @@ t_train = t_[rand_idx]
 pinn = PINN(None)
 
 with torch.no_grad():
-    x_ts = torch.tensor(x_, dtype=torch.float64).to(device)
-    t_ts = torch.tensor(t_, dtype=torch.float64).to(device)
-    pinn.net.load_state_dict(torch.load("./Burgers/Burgers_identification/weight_0.pt"))
+    x_ts = torch.tensor(x_, dtype=torch.float32).to(device)
+    t_ts = torch.tensor(t_, dtype=torch.float32).to(device)
+    pinn.net.load_state_dict(torch.load("./Burgers/identification/weight_clean.pt"))
     u_pred = pinn.net(torch.hstack((x_ts, t_ts))).cpu().numpy().reshape((100, 256)).T
 
 ################ Plot ###################
@@ -118,7 +118,7 @@ ax.axis("off")
 
 l1 = pinn.net.state_dict()["lambda_1"].cpu().item()
 l2 = np.exp(pinn.net.state_dict()["lambda_2"].cpu().item())
-pinn.net.load_state_dict(torch.load("./Burgers/Burgers_identification/weight_1.pt"))
+pinn.net.load_state_dict(torch.load("./Burgers/identification/weight_noisy1.pt"))
 l1_noisy = pinn.net.state_dict()["lambda_1"].cpu().item()
 l2_noisy = np.exp(pinn.net.state_dict()["lambda_2"].cpu().item())
 
@@ -130,8 +130,5 @@ s5 = r"\end{tabular}$"
 s = s1 + s2 + s3 + s4 + s5
 ax.text(0.21, 0.35, s, size=25)
 fig.savefig(
-    "./Burgers/Burgers_identification/Burgers_sol.png",
-    bbox_inches="tight",
-    pad_inches=0,
-    dpi=500,
+    "./Burgers/identification/solution.png", bbox_inches="tight", pad_inches=0, dpi=500,
 )

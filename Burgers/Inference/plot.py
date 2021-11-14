@@ -1,13 +1,16 @@
 import sys
 
-sys.path.insert(0, "./Burgers")
+sys.path.append("./Burgers/Inference")
 import torch
-from Burgers import PINN, ub, lb, x_bc, t_bc
+from main import PINN, xt_bc
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.io import loadmat
+
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 
 pgf_with_latex = {  # setup matplotlib to use latex for output
     "text.usetex": True,  # use LaTeX to write all text
@@ -21,29 +24,33 @@ pgf_with_latex = {  # setup matplotlib to use latex for output
     "xtick.labelsize": 8,
     "ytick.labelsize": 8,
 }
-plt.rcParams.update(pgf_with_latex)
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-x_bc = x_bc.cpu().numpy()
-t_bc = t_bc.cpu().numpy()
+plt.rcParams.update(pgf_with_latex)
+
+xt_bc = xt_bc.cpu().numpy()
 
 
 pinn = PINN()
-pinn.net.load_state_dict(torch.load("./Burgers/Burgers_inference/weight.pt"))
+pinn.net.load_state_dict(torch.load("./Burgers/Inference/weight.pt"))
 
-x = np.arange(lb["x"], ub["x"], 0.01)
-t = np.arange(lb["t"], ub["t"], 0.01)
+x_min = -1
+x_max = 1
+t_min = 0
+t_max = 1
 
-x, t = np.meshgrid(x, t)
-x_ = np.reshape(x, (-1, 1))
-t_ = np.reshape(t, (-1, 1))
+x = np.arange(x_min, x_max, 0.01)
+t = np.arange(t_min, t_max, 0.01)
 
-x_ = torch.tensor(x_, dtype=torch.float64).to(device)
-t_ = torch.tensor(t_, dtype=torch.float64).to(device)
+x_mesh, t_mesh = np.meshgrid(x, t)
+x = np.reshape(x_mesh, (-1, 1))
+t = np.reshape(t_mesh, (-1, 1))
+
+x = torch.tensor(x, dtype=torch.float32).to(device)
+t = torch.tensor(t, dtype=torch.float32).to(device)
 with torch.no_grad():
-    u_pred = pinn.net(torch.hstack((x_, t_)))
+    u_pred = pinn.net(torch.hstack((x, t)))
 
-u_pred = u_pred.cpu().numpy().reshape(t.shape).T
+u_pred = u_pred.cpu().numpy().reshape(t_mesh.shape).T
 
 ############## Plot 1 ###############
 fig = plt.figure(figsize=(9, 5))
@@ -52,29 +59,29 @@ gs0.update(top=1 - 0.06, bottom=1 - 1 / 3, left=0.15, right=0.85, wspace=0)
 
 ax = fig.add_subplot(gs0[0, :])
 im = ax.imshow(
-    u_pred, cmap="rainbow", extent=[lb["t"], ub["t"], lb["x"], ub["x"]], aspect="auto"
+    u_pred, cmap="rainbow", extent=[t_min, t_max, x_min, x_max], aspect="auto"
 )
 divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
+cax = divider.append_axes("right", size="3%", pad=0.2)
 
 plt.colorbar(im, cax=cax, label="$u(x,t)$")
 ax.set_xlabel("$t$")
 ax.set_ylabel("$x$")
 ax.set_title(r"$u(x,t)$", fontsize=10)
 bc_pt = ax.scatter(
-    t_bc,
-    x_bc,
+    xt_bc[:, 1],
+    xt_bc[:, 0],
     s=15,
     c="black",
     marker="x",
-    label=f"Data ({len(t_bc):d} points)",
+    label=f"Data ({xt_bc.shape[0]:d} points)",
     clip_on=False,
 )
 ax.legend(frameon=False, loc="best")
 
 ############## Plot 2 ###############
-x = np.arange(lb["x"], ub["x"], 0.01)
-t = np.arange(lb["t"], ub["t"], 0.01)
+x = np.arange(x_min, x_max, 0.01)
+t = np.arange(t_min, t_max, 0.01)
 data = loadmat("./Burgers/burgers_shock.mat")
 x_ = data["x"]
 u_sol = data["usol"]
@@ -101,8 +108,5 @@ axes[1].legend(
 )
 
 fig.savefig(
-    "./Burgers/Burgers_inference/Burgers_sol.png",
-    bbox_inches="tight",
-    pad_inches=0,
-    dpi=500,
+    "./Burgers/Inference/solution.png", bbox_inches="tight", pad_inches=0, dpi=500,
 )
