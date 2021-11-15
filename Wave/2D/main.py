@@ -1,143 +1,109 @@
 import sys
 
-sys.path.append("./2D-Wave/")
-from Network import DNN
+sys.path.append(".")
+from network import DNN
 import numpy as np
 import torch
 from torch.autograd import Variable, grad
 from pyDOE import lhs
 
-torch.set_default_dtype(torch.float64)
-np.random.seed(42)
-device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # Parameters
-ub = 1.0
-lb = 0.0
+x_min = 0.0
+x_max = 2.0
+y_min = 0.0
+y_max = 3.0
+t_min = 0.0
+t_max = 1.0
 
-N_u = 500
+N_ic = 500
+N_bc = 200
 N_f = 20000
 
 
 ########
-x_points = np.random.uniform(lb, ub, (N_u, 1))
-y_points = np.random.uniform(lb, ub, (N_u, 1))
-t_points = np.random.uniform(lb, ub, (N_u, 1))
+x_points = lambda n: np.random.uniform(x_min, x_max, (n, 1))
+y_points = lambda n: np.random.uniform(y_min, y_max, (n, 1))
+t_points = lambda n: np.random.uniform(t_min, t_max, (n, 1))
 
-# source
-freq = 10  # 10 times
-x_src = np.ones((N_u, 1)) * ub / 2
-y_src = np.ones((N_u, 1)) * ub / 2
-t_src = t_points.copy()
-u_src = np.sin(t_src * 2 * np.pi * freq)
+# IC
+x_ic = x_points(N_ic)
+y_ic = y_points(N_ic)
+t_ic = np.zeros((N_ic, 1))
+xyt_ic = np.hstack([x_ic, y_ic, t_ic])
 
-x_src = torch.tensor(x_src, dtype=torch.float64).to(device)
-y_src = torch.tensor(y_src, dtype=torch.float64).to(device)
-t_src = torch.tensor(t_src, dtype=torch.float64).to(device)
-u_src = torch.tensor(u_src, dtype=torch.float64).to(device)
+u_ic = x_ic * y_ic * (2 - x_ic) * (3 - y_ic)
+u_t_ic = np.sin(x_ic * 2 * np.pi)
+
 
 ## BC
-x_bc1 = np.zeros((N_u, 1))
-y_bc1 = y_points.copy()
-t_bc1 = t_points.copy()
-u_bc1 = np.zeros((N_u, 1))
+x_bc1 = np.zeros((N_bc, 1))
+y_bc1 = y_points(N_bc)
+t_bc1 = t_points(N_bc)
+u_bc1 = np.zeros((N_bc, 1))
 
-x_bc2 = np.ones((N_u, 1)) * ub
-y_bc2 = y_points.copy()
-t_bc2 = t_points.copy()
-u_bc2 = np.zeros((N_u, 1))
+x_bc2 = np.ones((N_bc, 1)) * x_max
+y_bc2 = y_points(N_bc)
+t_bc2 = t_points(N_bc)
+u_bc2 = np.zeros((N_bc, 1))
 
-x_bc3 = x_points.copy()
-y_bc3 = np.zeros((N_u, 1))
-t_bc3 = t_points.copy()
-u_bc3 = np.zeros((N_u, 1))
+x_bc3 = x_points(N_bc)
+y_bc3 = np.zeros((N_bc, 1))
+t_bc3 = t_points(N_bc)
+u_bc3 = np.zeros((N_bc, 1))
 
-x_bc4 = x_points.copy()
-y_bc4 = np.ones((N_u, 1)) * ub
-t_bc4 = t_points.copy()
-u_bc4 = np.zeros((N_u, 1))
+x_bc4 = x_points(N_bc)
+y_bc4 = np.ones((N_bc, 1)) * y_max
+t_bc4 = t_points(N_bc)
+u_bc4 = np.zeros((N_bc, 1))
 
-x_bc_o0 = np.vstack([x_bc1, x_bc2, x_bc3, x_bc4])
-y_bc_o0 = np.vstack([y_bc1, y_bc2, y_bc3, y_bc4])
-t_bc_o0 = np.vstack([t_bc1, t_bc2, t_bc3, t_bc4])
-u_bc_o0 = np.vstack([u_bc1, u_bc2, u_bc3, u_bc4])
+x_bc = np.vstack([x_bc1, x_bc2, x_bc3, x_bc4])
+y_bc = np.vstack([y_bc1, y_bc2, y_bc3, y_bc4])
+t_bc = np.vstack([t_bc1, t_bc2, t_bc3, t_bc4])
+u_bc = np.vstack([u_bc1, u_bc2, u_bc3, u_bc4])
 
-x_case0 = np.zeros((N_u, 1))
-y_case0 = y_points.copy()
-t_case0 = t_points.copy()
-
-x_case1 = np.ones((N_u, 1)) * ub
-y_case1 = y_points.copy()
-t_case1 = t_points.copy()
-
-
-x_case2 = x_points.copy()
-y_case2 = np.zeros((N_u, 1))
-t_case2 = t_points.copy()
-
-x_case3 = x_points.copy()
-y_case3 = np.ones((N_u, 1)) * ub
-t_case3 = t_points.copy()
-
-x_case0 = torch.tensor(x_case0, dtype=torch.float64).to(device)
-y_case0 = torch.tensor(y_case0, dtype=torch.float64).to(device)
-t_case0 = torch.tensor(t_case0, dtype=torch.float64).to(device)
-x_case1 = torch.tensor(x_case1, dtype=torch.float64).to(device)
-y_case1 = torch.tensor(y_case1, dtype=torch.float64).to(device)
-t_case1 = torch.tensor(t_case1, dtype=torch.float64).to(device)
-x_case2 = torch.tensor(x_case2, dtype=torch.float64).to(device)
-y_case2 = torch.tensor(y_case2, dtype=torch.float64).to(device)
-t_case2 = torch.tensor(t_case2, dtype=torch.float64).to(device)
-x_case3 = torch.tensor(x_case3, dtype=torch.float64).to(device)
-y_case3 = torch.tensor(y_case3, dtype=torch.float64).to(device)
-t_case3 = torch.tensor(t_case3, dtype=torch.float64).to(device)
-
-x_case = [x_case0, x_case1, x_case2, x_case3]
-y_case = [x_case0, y_case1, y_case2, y_case3]
-t_case = [x_case0, t_case1, t_case2, t_case3]
-
-rand_idx = np.random.choice(len(x_bc_o0), N_u, replace=False)
-
-x_bc_o0_ts = torch.tensor(x_bc_o0[rand_idx], dtype=torch.float64).to(device)
-y_bc_o0_ts = torch.tensor(y_bc_o0[rand_idx], dtype=torch.float64).to(device)
-t_bc_o0_ts = torch.tensor(t_bc_o0[rand_idx], dtype=torch.float64).to(device)
-u_bc_o0_ts = torch.tensor(u_bc_o0[rand_idx], dtype=torch.float64).to(device)
-
+xyt_bc = np.hstack([x_bc, y_bc, t_bc])
 
 # collocation points
-col_pts = lb + (ub - lb) * lhs(3, N_f)
-x_f = col_pts[:, 0:1]
-y_f = col_pts[:, 1:2]
-t_f = col_pts[:, 2:3]
+x_f = x_min + (x_min - x_max) * lhs(1, N_f)
+y_f = y_min + (y_min - y_max) * lhs(1, N_f)
+t_f = t_min + (t_min - t_max) * lhs(1, N_f)
+xyt_f = np.hstack([x_f, y_f, t_f])
+xyt_f = np.vstack([xyt_f, xyt_bc, xyt_ic])
 
-
-x_f = torch.tensor(x_f, dtype=torch.float64).to(device)
-y_f = torch.tensor(y_f, dtype=torch.float64).to(device)
-t_f = torch.tensor(t_f, dtype=torch.float64).to(device)
+xyt_ic = torch.tensor(xyt_ic, dtype=torch.float32).to(device)
+u_ic = torch.tensor(u_ic, dtype=torch.float32).to(device)
+u_t_ic = torch.tensor(u_t_ic, dtype=torch.float32).to(device)
+xyt_bc = torch.tensor(xyt_bc, dtype=torch.float32).to(device)
+u_bc = torch.tensor(u_bc, dtype=torch.float32).to(device)
+xyt_f = torch.tensor(xyt_f, dtype=torch.float32).to(device)
 
 
 class PINN:
-    c = 1
+    c = 6
 
     def __init__(self) -> None:
-        self.net = DNN().to(device)
+        self.net = DNN(
+            dim_in=3, dim_out=1, n_layer=6, n_node=20, activation=torch.nn.Tanh()
+        ).to(device)
         self.iter = 0
         self.optimizer = torch.optim.LBFGS(
             self.net.parameters(),
             lr=1.0,
-            max_iter=5000,
-            max_eval=5000,
+            max_iter=50000,
+            max_eval=50000,
             history_size=50,
             tolerance_grad=1e-5,
             tolerance_change=1e-9,
             line_search_fn="strong_wolfe",
         )
 
-    def f(self, x, y, t):
-        x = Variable(x, requires_grad=True)
-        y = Variable(y, requires_grad=True)
-        t = Variable(t, requires_grad=True)
-        u = self.net(x, y, t)
+    def f(self, xyt):
+        x = Variable(xyt[:, 0:1], requires_grad=True)
+        y = Variable(xyt[:, 1:2], requires_grad=True)
+        t = Variable(xyt[:, 2:3], requires_grad=True)
+        u = self.net(torch.hstack([x, y, t]))
 
         u_x = grad(u.sum(), x, create_graph=True)[0]
         u_xx = grad(u_x.sum(), x, create_graph=True)[0]
@@ -152,42 +118,25 @@ class PINN:
         return f
 
     def closure(self):
-        u_src_pred = self.net(x_src, y_src, t_src)
-        mse_u_src = torch.mean(torch.square(u_src_pred - u_src))
-
-        u_o0_pred = self.net(x_bc_o0_ts, y_bc_o0_ts, t_bc_o0_ts)
-        mse_u_o0 = torch.mean(torch.square(u_o0_pred - u_bc_o0_ts))
-
-        mse_u_o1s = []
-        for i in range(len(x_case)):
-            x = Variable(x_case[i], requires_grad=True)
-            y = Variable(y_case[i], requires_grad=True)
-            t = Variable(t_case[i], requires_grad=True)
-
-            u = self.net(x, y, t)
-
-            u_x = grad(u.sum(), x, create_graph=True)[0]
-            u_y = grad(u.sum(), y, create_graph=True)[0]
-            u_t = grad(u.sum(), t, create_graph=True)[0]
-
-            if i == 0:
-                v = u_x - self.c * u_t
-            elif i == 1:
-                v = u_x + self.c * u_t
-            elif i == 2:
-                v = u_y - self.c * u_t
-            else:
-                v = u_y + self.c * u_t
-            mse_value = torch.mean(torch.square(v))
-            mse_u_o1s.append(mse_value)
-
-        mse_u_o1 = sum(mse_u_o1s) / 4
-        mse_u = (mse_u_src + mse_u_o0 + mse_u_o1) / 3
-        f = self.f(x_f, y_f, t_f)
-        mse_f = torch.mean(torch.square(f))
-        loss = mse_u + mse_f
-
         self.optimizer.zero_grad()
+
+        x = Variable(xyt_ic[:, 0:1], requires_grad=True)
+        y = Variable(xyt_ic[:, 1:2], requires_grad=True)
+        t = Variable(xyt_ic[:, 2:3], requires_grad=True)
+
+        u_ic_pred = self.net(torch.hstack([x, y, t]))
+        # u_t_ic_pred = grad(u_ic_pred.sum(), t, create_graph=True)[0]
+
+        mse_u_ic = torch.mean(torch.square(u_ic_pred - u_ic))
+        # mse_u_t_ic = torch.mean(torch.square(u_t_ic_pred - u_t_ic))
+
+        u_bc_pred = self.net(xyt_bc)
+        mse_u_bc = torch.mean(torch.square(u_bc_pred - u_bc))
+
+        f_pred = self.f(xyt_f)
+        mse_f = torch.mean(torch.square(f_pred))
+        loss = mse_u_ic + mse_u_bc + mse_f  # + mse_u_t_ic
+
         loss.backward()
         self.iter += 1
         print(f"\r{self.iter}, Loss : {loss.item():.5e}", end="")
@@ -200,4 +149,4 @@ class PINN:
 if __name__ == "__main__":
     pinn = PINN()
     pinn.optimizer.step(pinn.closure)
-    torch.save(pinn.net.state_dict(), "./2D-Wave/weight.pt")
+    torch.save(pinn.net.state_dict(), "./Wave/2D/weight.pt")

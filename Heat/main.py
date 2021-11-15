@@ -11,13 +11,7 @@ from matplotlib import offsetbox
 from torch.autograd import Variable
 from matplotlib.animation import FuncAnimation
 
-dtype = torch.float32  # Or torch.float64
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-torch.backends.cuda.matmul.allow_tf32 = False
-torch.set_default_dtype(dtype)
-torch.manual_seed(1234)
-np.random.seed(1234)
 
 
 class PINN:
@@ -94,9 +88,9 @@ t_f = np.random.uniform(t_min, t_max, (N_f, 1))
 xt_f = np.hstack([x_f, t_f])
 xt_f = np.vstack([xt_f, xt_u])
 
-xt_u = torch.tensor(xt_u, dtype=dtype).to(device)
-u_u = torch.tensor(u_u, dtype=dtype).to(device)
-xt_f = torch.tensor(xt_f, dtype=dtype).to(device)
+xt_u = torch.tensor(xt_u, dtype=torch.float32).to(device)
+u_u = torch.tensor(u_u, dtype=torch.float32).to(device)
+xt_f = torch.tensor(xt_f, dtype=torch.float32).to(device)
 
 
 pinn = PINN()
@@ -111,8 +105,8 @@ ms_x, ms_t = np.meshgrid(x, t)
 x = ms_x.reshape(-1, 1)
 t = ms_t.reshape(-1, 1)
 
-x = torch.tensor(x, dtype=dtype).to(device)
-t = torch.tensor(t, dtype=dtype).to(device)
+x = torch.tensor(x, dtype=torch.float32).to(device)
+t = torch.tensor(t, dtype=torch.float32).to(device)
 xt = torch.hstack([x, t])
 u = pinn.net(xt)
 u = u.detach().cpu().numpy()
