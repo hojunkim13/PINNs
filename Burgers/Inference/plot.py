@@ -1,6 +1,3 @@
-import sys
-
-sys.path.append("./Burgers/Inference")
 import torch
 from main import PINN, xt_bc
 import numpy as np

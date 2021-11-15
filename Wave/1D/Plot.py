@@ -1,5 +1,5 @@
 import torch
-from solve import PINN, x_min, x_max, t_min, t_max
+from main import PINN, x_min, x_max, t_min, t_max
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation

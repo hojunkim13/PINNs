@@ -1,6 +1,3 @@
-import sys
-
-sys.path.append("./Burgers/Identification")
 import torch
 from main import PINN, u_
 import numpy as np

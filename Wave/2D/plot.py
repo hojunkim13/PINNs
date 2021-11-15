@@ -1,6 +1,3 @@
-import sys
-
-sys.path.append("./Wave/2D")
 import torch
 from main import PINN
 import numpy as np
@@ -14,11 +11,11 @@ pinn.net.load_state_dict(torch.load("./Wave/2D/weight.pt"))
 
 
 x_min = 0.0
-x_max = 2.0
+x_max = 1.0
 y_min = 0.0
-y_max = 3.0
+y_max = 1.0
 t_min = 0.0
-t_max = 1.0
+t_max = 2.0
 
 x = np.arange(x_min, x_max, 0.01)
 y = np.arange(y_min, y_max, 0.01)
@@ -58,7 +55,8 @@ cb = fig.colorbar(plot[0], ax=ax, fraction=0.046, pad=0.2)
 
 
 def update(frame, plot):
-    ax.view_init(elev=30, azim=frame)
+    azim = int(frame / u.shape[-1] * 360)
+    ax.view_init(elev=30, azim=azim)
     plot[0].remove()
     plot[0] = ax.plot_surface(
         x_mesh[:, :, 0],
