@@ -34,7 +34,6 @@ text = ax.text(0.40, 1.01, "", transform=ax.transAxes)
 
 
 def update(frame):
-    # ax.plot(x, u_pred[:, frame], color="k")
     line.set_data(x, u_pred[:, frame])
     text.set_text(f"$t\ =\ {t[frame]:.2f}\ [sec]$")
 

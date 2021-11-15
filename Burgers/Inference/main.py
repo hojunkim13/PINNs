@@ -8,9 +8,6 @@ import torch
 from torch.autograd import grad, Variable
 from pyDOE import lhs
 
-torch.manual_seed(1234)
-np.random.seed(1234)
-torch.backends.cuda.matmul.allow_tf32 = False
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 

@@ -7,9 +7,6 @@ import torch
 from torch.autograd import Variable, grad
 from pyDOE import lhs
 
-torch.manual_seed(1234)
-np.random.seed(1234)
-torch.backends.cuda.matmul.allow_tf32 = False
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # Parameters
@@ -18,22 +15,23 @@ x_max = 1
 t_min = 0
 t_max = 1
 
-N_u = 100
+N_u = 200
 N_f = 10000
 
 
-## IC , u(x,0) =
+## IC , u(x,0) = 0
 x_ic = np.random.uniform(x_min, x_max, (N_u, 1))
 t_ic = np.zeros((N_u, 1))
 # u_ic = np.zeros((N_u, 1))
+u_ic = np.sin(x_ic * np.pi)
 xt_ic = np.hstack([x_ic, t_ic])
-u_ic = np.sin(x_ic * np.pi * 2)
 
 # BC : Controlled end points, u(x,0) = u(x,L) = 0
+# BC : Controlled end points, u(x,0) = sin(2pi * t * freq), u(x, L) = 0
 x_bc1 = np.zeros((N_u, 1))
 t_bc1 = np.random.uniform(t_min, t_max, (N_u, 1))
-# u_bc1 = np.sin(t_bc1 * 2 * np.pi)
 u_bc1 = np.zeros((N_u, 1))
+# u_bc1 = np.sin(2 * np.pi * t_bc1 * 2)
 
 x_bc2 = np.ones((N_u, 1)) * x_max
 t_bc2 = np.random.uniform(t_min, t_max, (N_u, 1))
@@ -69,7 +67,7 @@ class PINN:
         self.net = DNN(
             dim_in=2, dim_out=1, n_layer=5, n_node=20, activation=torch.nn.Tanh()
         ).to(device)
-        self.lbfgs = torch.optim.LBFGS(
+        self.optimizer = torch.optim.LBFGS(
             self.net.parameters(),
             lr=1.0,
             max_iter=10000,
@@ -79,7 +77,6 @@ class PINN:
             tolerance_change=1.0 * np.finfo(float).eps,
             line_search_fn="strong_wolfe",
         )
-        self.adam = torch.optim.Adagrad(self.net.parameters())
         self.ms = lambda x: torch.mean(torch.square(x))
         self.iter = 0
 
@@ -99,8 +96,7 @@ class PINN:
 
     def closure(self):
         # IC
-        self.lbfgs.zero_grad()
-        self.adam.zero_grad()
+        self.optimizer.zero_grad()
 
         x = Variable(xt_ic[:, 0:1], requires_grad=True)
         t = Variable(xt_ic[:, 1:2], requires_grad=True)
@@ -136,10 +132,5 @@ class PINN:
 
 if __name__ == "__main__":
     pinn = PINN()
-    print("Learning with ADAM optimizer")
-    for i in range(10000):
-        pinn.closure()
-        pinn.adam.step()
-    print("Learning with L-BFGS-B optimizer")
-    pinn.lbfgs.step(pinn.closure)
+    pinn.optimizer.step(pinn.closure)
     torch.save(pinn.net.state_dict(), "./Wave/1D/weight.pt")

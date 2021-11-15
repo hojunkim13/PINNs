@@ -1,4 +1,10 @@
+import torch
 import torch.nn as nn
+import numpy as np
+
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.manual_seed(1234)
+np.random.seed(1234)
 
 
 class layer(nn.Module):
@@ -23,9 +29,16 @@ class DNN(nn.Module):
         for _ in range(n_layer):
             self.net.append(layer(n_node, n_node, activation))
         self.net.append(layer(n_node, dim_out, activation=None))
+        self.net.apply(weights_init)
 
     def forward(self, xt):
         out = xt
         for layer in self.net:
             out = layer(out)
         return out
+
+
+def weights_init(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_uniform_(m.weight.data)
+        torch.nn.init.zeros_(m.bias.data)

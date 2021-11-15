@@ -2,7 +2,7 @@ import sys
 
 sys.path.append("./Burgers/Identification")
 import torch
-from main import PINN
+from main import PINN, u_
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -34,7 +34,6 @@ u = data["usol"]
 x_, t_ = np.meshgrid(x, t)
 x_ = x_.reshape(-1, 1)
 t_ = t_.reshape(-1, 1)
-u_ = u.reshape(-1, 1)
 
 rand_idx = np.random.choice(len(u_), 2000, replace=False)
 x_train = x_[rand_idx]
@@ -74,7 +73,7 @@ data_pt = ax.plot(
 )
 
 divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.10)
+cax = divider.append_axes("right", size="3%", pad=0.2)
 cbar = fig.colorbar(im, cax=cax, label="$u(x,t)$")
 cbar.ax.tick_params(labelsize=15)
 
