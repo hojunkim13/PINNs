@@ -15,10 +15,10 @@ x_max = 1.0
 y_min = 0.0
 y_max = 1.0
 t_min = 0.0
-t_max = 2.0
+t_max = 1.0
 
 N_ic = 500
-N_bc = 200
+N_bc = 400
 N_f = 20000
 
 
@@ -34,9 +34,6 @@ t_ic = np.zeros((N_ic, 1))
 xyt_ic = np.hstack([x_ic, y_ic, t_ic])
 
 u_ic = np.sin(2 * np.pi * x_ic) * np.sin(np.pi * y_ic)
-u_t_ic = np.zeros((N_ic, 1))
-# u_t_ic = np.sin(x_ic * 2 * np.pi)
-
 
 ## BC
 x_bc1 = np.zeros((N_bc, 1))
@@ -59,17 +56,11 @@ y_bc4 = np.ones((N_bc, 1)) * y_max
 t_bc4 = t_points(N_bc)
 u_bc4 = np.zeros((N_bc, 1))
 
-x_bc_x = np.vstack([x_bc1, x_bc2])
-y_bc_x = np.vstack([y_bc1, y_bc2])
-t_bc_x = np.vstack([t_bc1, t_bc2])
-xyt_bc_x = np.hstack([x_bc_x, y_bc_x, t_bc_x])
-u_bc_x = np.vstack([u_bc1, u_bc2])
-
-x_bc_y = np.vstack([x_bc3, x_bc4])
-y_bc_y = np.vstack([y_bc3, y_bc4])
-t_bc_y = np.vstack([t_bc3, t_bc4])
-xyt_bc_y = np.hstack([x_bc_y, y_bc_y, t_bc_y])
-u_bc_y = np.vstack([u_bc3, u_bc4])
+x_bc = np.vstack([x_bc1, x_bc2, x_bc3, x_bc4])
+y_bc = np.vstack([y_bc1, y_bc2, y_bc3, y_bc4])
+t_bc = np.vstack([t_bc1, t_bc2, t_bc3, t_bc4])
+xyt_bc = np.hstack([x_bc, y_bc, t_bc])
+u_bc = np.vstack([u_bc1, u_bc2, u_bc3, u_bc4])
 
 
 # collocation points
@@ -77,15 +68,12 @@ x_f = x_min + (x_max - x_min) * lhs(1, N_f)
 y_f = y_min + (y_max - y_min) * lhs(1, N_f)
 t_f = t_min + (t_max - t_min) * lhs(1, N_f)
 xyt_f = np.hstack([x_f, y_f, t_f])
-xyt_f = np.vstack([xyt_f, xyt_bc_x, xyt_bc_y, xyt_ic])
+xyt_f = np.vstack([xyt_f, xyt_bc, xyt_ic])
 
 xyt_ic = torch.tensor(xyt_ic, dtype=torch.float32).to(device)
 u_ic = torch.tensor(u_ic, dtype=torch.float32).to(device)
-u_t_ic = torch.tensor(u_t_ic, dtype=torch.float32).to(device)
-xyt_bc_x = torch.tensor(xyt_bc_x, dtype=torch.float32).to(device)
-xyt_bc_y = torch.tensor(xyt_bc_y, dtype=torch.float32).to(device)
-u_bc_x = torch.tensor(u_bc_x, dtype=torch.float32).to(device)
-u_bc_y = torch.tensor(u_bc_y, dtype=torch.float32).to(device)
+xyt_bc = torch.tensor(xyt_bc, dtype=torch.float32).to(device)
+u_bc = torch.tensor(u_bc, dtype=torch.float32).to(device)
 xyt_f = torch.tensor(xyt_f, dtype=torch.float32).to(device)
 
 
@@ -104,33 +92,11 @@ class PINN:
             max_eval=50000,
             history_size=50,
             tolerance_grad=1e-5,
-            tolerance_change=1e-9,
+            tolerance_change=1.0 * np.finfo(float).eps,
             line_search_fn="strong_wolfe",
         )
 
-    def ic(self, xyt):
-        x = xyt[:, 0:1]
-        y = xyt[:, 1:2]
-        t = Variable(xyt[:, 2:3], requires_grad=True)
-        u = self.net(torch.hstack([x, y, t]))
-        u_t = grad(u.sum(), t, create_graph=True)[0]
-        return u, u_t
-
-    def bc_x(self, xyt):
-        x = Variable(xyt[:, 0:1], requires_grad=True)
-        y = xyt[:, 1:2]
-        t = xyt[:, 2:3]
-        u = self.net(torch.hstack([x, y, t]))
-        u_x = grad(u.sum(), x, create_graph=True)[0]
-        return u, u_x
-
-    def bc_y(self, xyt):
-        x = xyt[:, 0:1]
-        y = Variable(xyt[:, 1:2], requires_grad=True)
-        t = xyt[:, 2:3]
-        u = self.net(torch.hstack([x, y, t]))
-        u_y = grad(u.sum(), y, create_graph=True)[0]
-        return u, u_y
+        self.adam = torch.optim.Adam(self.net.parameters(), lr=1e-3)
 
     def f(self, xyt):
         x = Variable(xyt[:, 0:1], requires_grad=True)
@@ -152,19 +118,13 @@ class PINN:
 
     def closure(self):
         self.optimizer.zero_grad()
+        self.adam.zero_grad()
 
-        u_ic_pred, u_t_ic_pred = self.ic(xyt_ic)
-        mse_u_ic = torch.mean(torch.square(u_ic_pred - u_ic))
-        mse_u_t_ic = torch.mean(torch.square(u_t_ic_pred - u_t_ic))
-        mse_ic = mse_u_ic
-        # mse_ic += mse_u_t_ic
+        u_ic_pred = self.net(xyt_ic)
+        mse_ic = torch.mean(torch.square(u_ic_pred - u_ic))
 
-        # _, u_x_bc_pred = self.bc_x(xyt_bc_x)
-        # _, u_y_bc_pred = self.bc_y(xyt_bc_y)
-        u_bc_pred_x, _ = self.bc_x(xyt_bc_y)
-        u_bc_pred_y, _ = self.bc_y(xyt_bc_y)
-        mse_bc = torch.mean(torch.square(u_bc_pred_x - u_bc_x))
-        mse_bc += torch.mean(torch.square(u_bc_pred_y - u_bc_y))
+        u_bc_pred = self.net(xyt_bc)
+        mse_bc = torch.mean(torch.square(u_bc_pred - u_bc))
 
         f_pred = self.f(xyt_f)
         mse_f = torch.mean(torch.square(f_pred))
@@ -173,7 +133,7 @@ class PINN:
         loss.backward()
         self.iter += 1
         print(
-            f"\r{self.iter}, Loss : {loss.item():.5e}, ic : {mse_ic.item():.3e}, bc : {mse_bc.item():.3e}, f : {mse_f.item():.3e},",
+            f"\r{self.iter} Loss: {loss.item():.5e} IC: {mse_ic.item():.3e} BC: {mse_bc.item():.3e} f: {mse_f.item():.3e}",
             end="",
         )
         if self.iter % 500 == 0:
@@ -184,5 +144,8 @@ class PINN:
 
 if __name__ == "__main__":
     pinn = PINN()
+    for i in range(5000):
+        pinn.closure()
+        pinn.adam.step()
     pinn.optimizer.step(pinn.closure)
     torch.save(pinn.net.state_dict(), "./Wave/2D/weight.pt")
