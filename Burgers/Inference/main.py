@@ -5,7 +5,7 @@ sys.path.insert(0, ".")
 from network import DNN
 import numpy as np
 import torch
-from torch.autograd import grad, Variable
+from torch.autograd import grad
 from pyDOE import lhs
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -17,6 +17,7 @@ f = u_t + u*u_x - (0.01 / pi) * u_xx = 0, x ~ [-1, 1], t ~ [0, 1]
 u(x, 0) = -sin(pi * x)
 u(-1, t) = u(1, t) = 0
 """
+
 N_u = 100
 N_f = 10000
 
@@ -74,14 +75,14 @@ class PINN:
         self.iter = 0
 
     def f(self, xt):
-        x = Variable(xt[:, 0:1], requires_grad=True)
-        t = Variable(xt[:, 1:2], requires_grad=True)
+        xt = xt.clone()
+        xt.requires_grad = True
+        u = self.net(xt)
 
-        u = self.net(torch.cat((x, t), dim=1))
-
-        u_t = grad(u.sum(), t, create_graph=True)[0]
-        u_x = grad(u.sum(), x, create_graph=True)[0]
-        u_xx = grad(u_x.sum(), x, create_graph=True)[0]
+        u_xt = grad(u.sum(), xt, create_graph=True)[0]
+        u_x = u_xt[:, 0:1]
+        u_t = u_xt[:, 1:2]
+        u_xx = grad(u_x.sum(), xt, create_graph=True)[0][:, 0:1]
 
         f = u_t + u * u_x - self.mu * u_xx
         return f

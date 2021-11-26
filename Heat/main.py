@@ -8,7 +8,7 @@ import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import offsetbox
-from torch.autograd import Variable
+from torch.autograd import grad
 from matplotlib.animation import FuncAnimation
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -31,13 +31,14 @@ class PINN:
         self.iter = 0
 
     def f(self, xt):
-        x = Variable(xt[:, 0:1], requires_grad=True)
-        t = Variable(xt[:, 1:2], requires_grad=True)
+        xt = xt.clone()
+        xt.requires_grad = True
 
-        u = self.net(torch.cat([x, t], dim=1))
-        u_t = torch.autograd.grad(u.sum(), t, create_graph=True)[0]
-        u_x = torch.autograd.grad(u.sum(), x, create_graph=True)[0]
-        u_xx = torch.autograd.grad(u_x.sum(), x, create_graph=True)[0]
+        u = self.net(xt)
+        u_xt = grad(u.sum(), xt, create_graph=True)[0]
+        u_x = u_xt[:, 0:1]
+        u_t = u_xt[:, 1:2]
+        u_xx = grad(u_x.sum(), xt, create_graph=True)[0][:, 0:1]
         f = u_t - self.c ** 2 * u_xx
         return f
 
