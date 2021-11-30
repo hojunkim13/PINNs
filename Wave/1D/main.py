@@ -4,7 +4,7 @@ sys.path.append(".")
 from network import DNN
 import numpy as np
 import torch
-from torch.autograd import Variable, grad
+from torch.autograd import grad
 from pyDOE import lhs
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -23,10 +23,8 @@ N_f = 10000
 x_ic = np.random.uniform(x_min, x_max, (N_u, 1))
 t_ic = np.zeros((N_u, 1))
 xt_ic = np.hstack([x_ic, t_ic])
-# u_ic = np.zeros((N_u, 1))
+u_ic = np.zeros((N_u, 1))
 u_ic = np.sin(x_ic * np.pi)
-u_t_ic = np.zeros((N_u, 1))
-# u_t_ic = -np.sin(x_ic * np.pi)
 
 # BC : Controlled end points, u(x,0) = u(x,L) = 0
 # BC : Controlled end points, u(x,0) = sin(2pi * t * freq), u(x, L) = 0
@@ -53,7 +51,6 @@ t_f = np.vstack([t_ic, t_bc, t_f])
 
 xt_ic = torch.tensor(xt_ic, dtype=torch.float32).to(device)
 u_ic = torch.tensor(u_ic, dtype=torch.float32).to(device)
-u_t_ic = torch.tensor(u_t_ic, dtype=torch.float32).to(device)
 
 xt_bc = torch.tensor(xt_bc, dtype=torch.float32).to(device)
 u_bc = torch.tensor(u_bc, dtype=torch.float32).to(device)
@@ -84,30 +81,25 @@ class PINN:
         self.iter = 0
 
     def f(self, xt):
-        x = Variable(xt[:, 0:1], requires_grad=True)
-        t = Variable(xt[:, 1:2], requires_grad=True)
-        u = self.net(torch.hstack([x, t]))
+        xt = xt.clone()
+        xt.requires_grad = True
+        u = self.net(xt)
 
-        u_x = grad(u.sum(), x, create_graph=True)[0]
-        u_xx = grad(u_x.sum(), x, create_graph=True)[0]
+        u_xt = grad(u.sum(), xt, create_graph=True)[0]
+        u_x = u_xt[:, 0:1]
+        u_xx = grad(u_x.sum(), xt, create_graph=True)[0][:, 0:1]
 
-        u_t = grad(u.sum(), t, create_graph=True)[0]
-        u_tt = grad(u_t.sum(), t, create_graph=True)[0]
+        u_t = u_xt[:, 1:2]
+        u_tt = grad(u_t.sum(), xt, create_graph=True)[0][:, 1:2]
 
         f = u_tt - (self.c ** 2) * (u_xx)
         return f
 
     def closure(self):
-        # IC
         self.optimizer.zero_grad()
-
-        x = xt_ic[:, 0:1]
-        t = Variable(xt_ic[:, 1:2], requires_grad=True)
-
-        u_pred_ic = self.net(torch.hstack([x, t]))
-        u_t_pred_ic = grad(u_pred_ic.sum(), t, create_graph=True)[0]
-
-        mse_u_ic = self.ms(u_pred_ic - u_ic) + self.ms(u_t_pred_ic - u_t_ic)
+        # IC
+        u_pred_ic = self.net(xt_ic)
+        mse_u_ic = self.ms(u_pred_ic - u_ic)
 
         # BC
         u_pred_bc = self.net(xt_bc)

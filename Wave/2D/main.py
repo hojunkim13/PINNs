@@ -4,8 +4,9 @@ sys.path.append(".")
 from network import DNN
 import numpy as np
 import torch
-from torch.autograd import Variable, grad
+from torch.autograd import grad
 from pyDOE import lhs
+import matplotlib.pyplot as plt
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -22,7 +23,17 @@ N_bc = 400
 N_f = 20000
 
 
+def normalize(xyt):
+    xyt = xyt.clone()
+    lb = torch.tensor([x_min, y_min, t_min], dtype=torch.float).to(device)
+    ub = torch.tensor([x_max, y_max, t_max], dtype=torch.float).to(device)
+    xyt = (xyt - lb) / (ub - lb)
+    return xyt
+
+
 ########
+
+
 x_points = lambda n: np.random.uniform(x_min, x_max, (n, 1))
 y_points = lambda n: np.random.uniform(y_min, y_max, (n, 1))
 t_points = lambda n: np.random.uniform(t_min, t_max, (n, 1))
@@ -70,6 +81,7 @@ t_f = t_min + (t_max - t_min) * lhs(1, N_f)
 xyt_f = np.hstack([x_f, y_f, t_f])
 xyt_f = np.vstack([xyt_f, xyt_bc, xyt_ic])
 
+
 xyt_ic = torch.tensor(xyt_ic, dtype=torch.float32).to(device)
 u_ic = torch.tensor(u_ic, dtype=torch.float32).to(device)
 xyt_bc = torch.tensor(xyt_bc, dtype=torch.float32).to(device)
@@ -82,7 +94,7 @@ class PINN:
 
     def __init__(self) -> None:
         self.net = DNN(
-            dim_in=3, dim_out=1, n_layer=6, n_node=20, activation=torch.nn.Tanh()
+            dim_in=3, dim_out=1, n_layer=6, n_node=40, activation=torch.nn.Tanh()
         ).to(device)
         self.iter = 0
         self.optimizer = torch.optim.LBFGS(
@@ -95,24 +107,22 @@ class PINN:
             tolerance_change=1.0 * np.finfo(float).eps,
             line_search_fn="strong_wolfe",
         )
-
+        self.losses = {"ic": [], "bc": [], "pde": []}
         self.adam = torch.optim.Adam(self.net.parameters(), lr=1e-3)
 
+    def u(self, xyt):
+        return self.net(normalize(xyt))
+
     def f(self, xyt):
-        x = Variable(xyt[:, 0:1], requires_grad=True)
-        y = Variable(xyt[:, 1:2], requires_grad=True)
-        t = Variable(xyt[:, 2:3], requires_grad=True)
-        u = self.net(torch.hstack([x, y, t]))
+        g = xyt.clone()
+        g.requires_grad = True
 
-        u_x = grad(u.sum(), x, create_graph=True)[0]
-        u_xx = grad(u_x.sum(), x, create_graph=True)[0]
+        u = self.u(g)
 
-        u_y = grad(u.sum(), y, create_graph=True)[0]
-        u_yy = grad(u_y.sum(), y, create_graph=True)[0]
-
-        u_t = grad(u.sum(), t, create_graph=True)[0]
-        u_tt = grad(u_t.sum(), t, create_graph=True)[0]
-
+        u_xyt = grad(u.sum(), g, create_graph=True)[0]
+        u_xx = grad(u_xyt[:, 0:1].sum(), g, create_graph=True)[0][:, 0:1]
+        u_yy = grad(u_xyt[:, 1:2].sum(), g, create_graph=True)[0][:, 1:2]
+        u_tt = grad(u_xyt[:, 2:3].sum(), g, create_graph=True)[0][:, 2:3]
         f = u_tt - (self.c ** 2) * (u_xx + u_yy)
         return f
 
@@ -120,26 +130,41 @@ class PINN:
         self.optimizer.zero_grad()
         self.adam.zero_grad()
 
-        u_ic_pred = self.net(xyt_ic)
+        u_ic_pred = self.u(xyt_ic)
         mse_ic = torch.mean(torch.square(u_ic_pred - u_ic))
 
-        u_bc_pred = self.net(xyt_bc)
+        u_bc_pred = self.u(xyt_bc)
         mse_bc = torch.mean(torch.square(u_bc_pred - u_bc))
 
         f_pred = self.f(xyt_f)
         mse_f = torch.mean(torch.square(f_pred))
+
         loss = mse_ic + mse_bc + mse_f
 
         loss.backward()
+
+        self.losses["ic"].append(mse_ic.detach().cpu().item())
+        self.losses["bc"].append(mse_bc.detach().cpu().item())
+        self.losses["pde"].append(mse_f.detach().cpu().item())
         self.iter += 1
         print(
-            f"\r{self.iter} Loss: {loss.item():.5e} IC: {mse_ic.item():.3e} BC: {mse_bc.item():.3e} f: {mse_f.item():.3e}",
+            f"\r{self.iter} Loss: {loss.item():.5e} IC: {mse_ic.item():.3e} BC: {mse_bc.item():.3e} pde: {mse_f.item():.3e}",
             end="",
         )
         if self.iter % 500 == 0:
             print("")
 
         return loss
+
+
+def plotLoss(losses_dict):
+    fig, axes = plt.subplots(1, 3, sharex=True, sharey=True, figsize=(10, 6))
+    axes[0].set_yscale("log")
+    for i, j in zip(range(3), ["IC", "BC", "PDE"]):
+        axes[i].plot(losses_dict[j.lower()])
+        axes[i].set_title(j)
+    plt.show()
+    fig.savefig("./Wave/2d/loss_curve.png")
 
 
 if __name__ == "__main__":
@@ -149,3 +174,4 @@ if __name__ == "__main__":
         pinn.adam.step()
     pinn.optimizer.step(pinn.closure)
     torch.save(pinn.net.state_dict(), "./Wave/2D/weight.pt")
+    plotLoss(pinn.losses)
