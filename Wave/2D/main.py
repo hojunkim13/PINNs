@@ -18,6 +18,9 @@ y_max = 1.0
 t_min = 0.0
 t_max = 1.0
 
+ub = np.array([x_max, y_max, t_max])
+lb = np.array([x_min, y_min, t_min])
+
 N_ic = 500
 N_bc = 400
 N_f = 20000
@@ -94,7 +97,7 @@ class PINN:
 
     def __init__(self) -> None:
         self.net = DNN(
-            dim_in=3, dim_out=1, n_layer=6, n_node=40, activation=torch.nn.Tanh()
+            dim_in=3, dim_out=1, n_layer=6, n_node=40, ub=ub, lb=lb
         ).to(device)
         self.iter = 0
         self.optimizer = torch.optim.LBFGS(

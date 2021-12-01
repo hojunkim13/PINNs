@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 torch.backends.cuda.matmul.allow_tf32 = False
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 torch.manual_seed(1234)
 np.random.seed(1234)
 
@@ -14,6 +15,7 @@ class layer(nn.Module):
         self.activation = activation
 
     def forward(self, x):
+
         x = self.layer(x)
         if self.activation:
             x = self.activation(x)
@@ -21,18 +23,20 @@ class layer(nn.Module):
 
 
 class DNN(nn.Module):
-    def __init__(self, dim_in, dim_out, n_layer, n_node, activation=nn.Tanh()):
+    def __init__(self, dim_in, dim_out, n_layer, n_node, ub, lb, activation=nn.Tanh()):
         super().__init__()
-
         self.net = nn.ModuleList()
         self.net.append(layer(dim_in, n_node, activation))
         for _ in range(n_layer):
             self.net.append(layer(n_node, n_node, activation))
         self.net.append(layer(n_node, dim_out, activation=None))
         self.net.apply(weights_init)
+        self.ub = torch.tensor(ub, dtype=torch.float).to(device)
+        self.lb = torch.tensor(lb, dtype=torch.float).to(device)
 
-    def forward(self, xt):
-        out = xt
+    def forward(self, x):
+        x = (x - self.lb) / (self.ub - self.lb)
+        out = x
         for layer in self.net:
             out = layer(out)
         return out

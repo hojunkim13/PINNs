@@ -13,14 +13,52 @@ from matplotlib.animation import FuncAnimation
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+N_u = 100
+N_f = 10000
+
+x_min = 0.0
+x_max = 1.0
+t_min = 0.0
+t_max = 1.0
+
+ub = np.array([x_max, t_max])
+lb = np.array([x_min, t_min])
+
+# initial condition, u(x, 0) = f(x)
+x_ic = np.random.uniform(low=x_min, high=x_max, size=(N_u, 1))
+t_ic = np.zeros((N_u, 1))
+u_ic = np.ones((N_u, 1))
+
+# Case 1. Const End, u(0, t) = T
+# Case 2. Insulated End, u_x(0, t) = 0
+# Case 3. Radiating End, u_x(0, t) = A * u(x0, t)
+
+x_bc = np.zeros((N_u, 1))
+t_bc = np.random.uniform(low=t_min, high=t_max, size=(N_u, 1))
+u_bc = np.zeros((N_u, 1))
+
+x_u = np.concatenate((x_ic, x_bc), axis=0)
+t_u = np.concatenate((t_ic, t_bc), axis=0)
+xt_u = np.concatenate((x_u, t_u), axis=1)
+u_u = np.concatenate((u_ic, u_bc), axis=0)
+
+x_f = np.random.uniform(x_min, x_max, (N_f, 1))
+t_f = np.random.uniform(t_min, t_max, (N_f, 1))
+xt_f = np.hstack([x_f, t_f])
+xt_f = np.vstack([xt_f, xt_u])
+
+xt_u = torch.tensor(xt_u, dtype=torch.float32).to(device)
+u_u = torch.tensor(u_u, dtype=torch.float32).to(device)
+xt_f = torch.tensor(xt_f, dtype=torch.float32).to(device)
+
 
 class PINN:
     c = 1
 
     def __init__(self) -> None:
-        self.net = DNN(
-            dim_in=2, dim_out=1, n_layer=4, n_node=20, activation=nn.Tanh()
-        ).to(device)
+        self.net = DNN(dim_in=2, dim_out=1, n_layer=4, n_node=20, ub=ub, lb=lb).to(
+            device
+        )
         self.optimizer = torch.optim.LBFGS(
             self.net.parameters(),
             lr=1.0,
@@ -56,42 +94,6 @@ class PINN:
         if self.iter % 500 == 0:
             print("")
         return loss
-
-
-N_u = 100
-N_f = 10000
-
-x_min = 0.0
-x_max = 1.0
-t_min = 0.0
-t_max = 1.0
-
-# initial condition, u(x, 0) = f(x)
-x_ic = np.random.uniform(low=x_min, high=x_max, size=(N_u, 1))
-t_ic = np.zeros((N_u, 1))
-u_ic = np.ones((N_u, 1))
-
-# Case 1. Const End, u(0, t) = T
-# Case 2. Insulated End, u_x(0, t) = 0
-# Case 3. Radiating End, u_x(0, t) = A * u(x0, t)
-
-x_bc = np.zeros((N_u, 1))
-t_bc = np.random.uniform(low=t_min, high=t_max, size=(N_u, 1))
-u_bc = np.zeros((N_u, 1))
-
-x_u = np.concatenate((x_ic, x_bc), axis=0)
-t_u = np.concatenate((t_ic, t_bc), axis=0)
-xt_u = np.concatenate((x_u, t_u), axis=1)
-u_u = np.concatenate((u_ic, u_bc), axis=0)
-
-x_f = np.random.uniform(x_min, x_max, (N_f, 1))
-t_f = np.random.uniform(t_min, t_max, (N_f, 1))
-xt_f = np.hstack([x_f, t_f])
-xt_f = np.vstack([xt_f, xt_u])
-
-xt_u = torch.tensor(xt_u, dtype=torch.float32).to(device)
-u_u = torch.tensor(u_u, dtype=torch.float32).to(device)
-xt_f = torch.tensor(xt_f, dtype=torch.float32).to(device)
 
 
 pinn = PINN()

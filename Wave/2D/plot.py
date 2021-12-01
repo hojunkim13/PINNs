@@ -29,7 +29,6 @@ xyt = np.hstack([x_, y_, t_])
 xyt = torch.tensor(xyt, dtype=torch.float).to(device)
 
 u = pinn.net(normalize(xyt)).detach().cpu().numpy().reshape(x_mesh.shape)
-u = np.swapaxes(u, 0, 1)
 # u = np.sin(2 * np.pi * x_mesh) * np.sin(np.pi * y_mesh)
 
 fig = plt.figure()

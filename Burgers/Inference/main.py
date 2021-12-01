@@ -27,6 +27,9 @@ x_max = 1
 t_min = 0
 t_max = 1
 
+ub = np.array([x_max, t_max])
+lb = np.array([x_min, t_min])
+
 x_bc1 = np.random.uniform(x_min, x_max, (N_u, 1))
 t_bc1 = np.zeros((N_u, 1))
 u_bc1 = -np.sin(np.pi * x_bc1)
@@ -58,10 +61,9 @@ class PINN:
     mu = 0.01 / np.pi
 
     def __init__(self):
-        self.net = DNN(
-            dim_in=2, dim_out=1, n_layer=7, n_node=20, activation=torch.nn.Tanh()
+        self.net = DNN(dim_in=2, dim_out=1, n_layer=7, n_node=20, ub=ub, lb=lb).to(
+            device
         )
-        self.net.to(device)
         self.optimizer = torch.optim.LBFGS(
             self.net.parameters(),
             lr=1.0,

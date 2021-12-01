@@ -15,6 +15,9 @@ x_max = 1
 t_min = 0
 t_max = 1
 
+ub = np.array([x_max, t_max])
+lb = np.array([x_min, t_min])
+
 N_u = 200
 N_f = 10000
 
@@ -24,14 +27,11 @@ x_ic = np.random.uniform(x_min, x_max, (N_u, 1))
 t_ic = np.zeros((N_u, 1))
 xt_ic = np.hstack([x_ic, t_ic])
 u_ic = np.zeros((N_u, 1))
-u_ic = np.sin(x_ic * np.pi)
 
-# BC : Controlled end points, u(x,0) = u(x,L) = 0
 # BC : Controlled end points, u(x,0) = sin(2pi * t * freq), u(x, L) = 0
 x_bc1 = np.zeros((N_u, 1))
 t_bc1 = np.random.uniform(t_min, t_max, (N_u, 1))
-u_bc1 = np.zeros((N_u, 1))
-# u_bc1 = np.sin(2 * np.pi * t_bc1 * 2)
+u_bc1 = np.sin(2 * np.pi * t_bc1 * 2)
 
 x_bc2 = np.ones((N_u, 1)) * x_max
 t_bc2 = np.random.uniform(t_min, t_max, (N_u, 1))
@@ -64,14 +64,14 @@ class PINN:
     c = 1
 
     def __init__(self) -> None:
-        self.net = DNN(
-            dim_in=2, dim_out=1, n_layer=5, n_node=20, activation=torch.nn.Tanh()
-        ).to(device)
+        self.net = DNN(dim_in=2, dim_out=1, n_layer=5, n_node=20, ub=ub, lb=lb).to(
+            device
+        )
         self.optimizer = torch.optim.LBFGS(
             self.net.parameters(),
             lr=1.0,
-            max_iter=10000,
-            max_eval=10000,
+            max_iter=50000,
+            max_eval=50000,
             history_size=50,
             tolerance_grad=1e-5,
             tolerance_change=1.0 * np.finfo(float).eps,

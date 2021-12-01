@@ -23,6 +23,9 @@ x = data["x"]
 t = data["t"]
 u = data["usol"].T
 
+ub = np.array([x.max(), t.max()])
+lb = np.array([x.min(), t.min()])
+
 # Clean Data Preparation
 x_, t_ = np.meshgrid(x, t)
 x_ = x_.reshape(-1, 1)
@@ -48,9 +51,9 @@ class PINN:
         self.lambda_2 = torch.tensor([-6.0], requires_grad=True).to(device)
         self.lambda_1 = torch.nn.Parameter(self.lambda_1)
         self.lambda_2 = torch.nn.Parameter(self.lambda_2)
-        self.net = DNN(
-            dim_in=2, dim_out=1, n_layer=7, n_node=20, activation=torch.nn.Tanh()
-        ).to(device)
+        self.net = DNN(dim_in=2, dim_out=1, n_layer=7, n_node=20, ub=ub, lb=lb,).to(
+            device
+        )
         self.net.register_parameter("lambda_1", self.lambda_1)
         self.net.register_parameter("lambda_2", self.lambda_2)
 
