@@ -34,26 +34,26 @@ pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio===0.10.0+c
 Run the `main.py` to train PINN, then run `plot.py` to generate result.
 
 ### Result
-<img src="./Burgers/Inference/solution.png" width="50%" height="50%" />  
-<figcaption>Bergers-inference</figcaption><br>
+<figcaption>Bergers-inference</figcaption>
+<img src="./Burgers/Inference/solution.png" width="80%" height="80%"/><br>
 
-<img src="./Burgers/Identification/solution.png" width="50%" height="50%"/>       
-<figcaption>Bergers-Identification</figcaption><br>
+<figcaption>Bergers-Identification</figcaption>
+<img src="./Burgers/Identification/solution.png" width="80%" height="80%"/><br>
 
-<img src="./Heat/solution.gif" width="50%" height="50%"/>
-<figcaption>Heat Equation</figcaption><br>
+<figcaption>Heat Equation</figcaption>
+<img src="./Heat/solution.gif" width="80%" height="80%"/><br>
 
-<img src="./Navier-Stokes/solution.png" width="50%" height="50%"/>
-<figcaption>Navier-Stokes Equation</figcaption><br>
+<figcaption>Navier-Stokes Equation</figcaption>
+<img src="./Navier-Stokes/solution.png" width="80%" height="80%"/><br>
 
-<img src="./Schrodinger/solution.png" width="50%" height="50%"/>
-<figcaption>Schrodinger Equation</figcaption><br>
+<figcaption>Schrodinger Equation</figcaption>
+<img src="./Schrodinger/solution.png" width="80%" height="80%"/><br>
 
-<img src="./Wave/1D/solution.gif" width="50%" height="50%"/>
-<figcaption>1D Wave Equation</figcaption><br>
+<figcaption>1D Wave Equation</figcaption>
+<img src="./Wave/1D/solution.gif" width="80%" height="80%"/><br>
 
-<img src="./Wave/2D/solution.gif" width="50%" height="50%"/>
-<figcaption>2D Wave Equation</figcaption><br>
+<figcaption>2D Wave Equation</figcaption>
+<img src="./Wave/2D/solution.gif" width="80%" height="80%"/><br>
 
 ## License 
 
