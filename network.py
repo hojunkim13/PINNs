@@ -2,7 +2,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cuda.matmul.allow_tf32 = (
+    False  # This is for Nvidia Ampere GPU Architechture
+)
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 torch.manual_seed(1234)
 np.random.seed(1234)
@@ -15,7 +17,6 @@ class layer(nn.Module):
         self.activation = activation
 
     def forward(self, x):
-
         x = self.layer(x)
         if self.activation:
             x = self.activation(x)
@@ -30,12 +31,12 @@ class DNN(nn.Module):
         for _ in range(n_layer):
             self.net.append(layer(n_node, n_node, activation))
         self.net.append(layer(n_node, dim_out, activation=None))
-        self.net.apply(weights_init)
         self.ub = torch.tensor(ub, dtype=torch.float).to(device)
         self.lb = torch.tensor(lb, dtype=torch.float).to(device)
+        self.net.apply(weights_init)  # xavier initialization
 
     def forward(self, x):
-        x = (x - self.lb) / (self.ub - self.lb)
+        x = (x - self.lb) / (self.ub - self.lb)  # Min-max scaling
         out = x
         for layer in self.net:
             out = layer(out)
