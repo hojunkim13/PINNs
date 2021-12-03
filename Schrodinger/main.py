@@ -7,7 +7,6 @@ import numpy as np
 import torch
 from torch.autograd import grad
 from pyDOE import lhs
-from scipy.io import loadmat
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
