@@ -2,11 +2,11 @@ import sys
 
 sys.path.append(".")
 from network import DNN
+from Utils import *
 import numpy as np
 import torch
 from torch.autograd import grad
 from pyDOE import lhs
-import matplotlib.pyplot as plt
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -21,8 +21,8 @@ t_max = 1.0
 ub = np.array([x_max, y_max, t_max])
 lb = np.array([x_min, y_min, t_min])
 
-N_ic = 500
-N_bc = 400
+N_ic = 50
+N_bc = 50
 N_f = 20000
 
 
@@ -96,9 +96,9 @@ class PINN:
     c = 1
 
     def __init__(self) -> None:
-        self.net = DNN(
-            dim_in=3, dim_out=1, n_layer=6, n_node=40, ub=ub, lb=lb
-        ).to(device)
+        self.net = DNN(dim_in=3, dim_out=1, n_layer=6, n_node=40, ub=ub, lb=lb).to(
+            device
+        )
         self.iter = 0
         self.optimizer = torch.optim.LBFGS(
             self.net.parameters(),
@@ -160,16 +160,6 @@ class PINN:
         return loss
 
 
-def plotLoss(losses_dict):
-    fig, axes = plt.subplots(1, 3, sharex=True, sharey=True, figsize=(10, 6))
-    axes[0].set_yscale("log")
-    for i, j in zip(range(3), ["IC", "BC", "PDE"]):
-        axes[i].plot(losses_dict[j.lower()])
-        axes[i].set_title(j)
-    plt.show()
-    fig.savefig("./Wave/2d/loss_curve.png")
-
-
 if __name__ == "__main__":
     pinn = PINN()
     for i in range(5000):
@@ -177,4 +167,4 @@ if __name__ == "__main__":
         pinn.adam.step()
     pinn.optimizer.step(pinn.closure)
     torch.save(pinn.net.state_dict(), "./Wave/2D/weight.pt")
-    plotLoss(pinn.losses)
+    plotLoss(pinn.losses, "./Wave/2d/loss_curve.png")

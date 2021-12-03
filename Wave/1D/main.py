@@ -18,7 +18,7 @@ t_max = 1
 ub = np.array([x_max, t_max])
 lb = np.array([x_min, t_min])
 
-N_u = 200
+N_u = 50
 N_f = 10000
 
 
