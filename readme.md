@@ -68,3 +68,5 @@ This project is licensed under the MIT License - see the [LICENSE](https://githu
 - Raissi, Maziar, Paris Perdikaris, and George E. Karniadakis. "[Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations](https://www.sciencedirect.com/science/article/pii/S0021999118307125)." Journal of Computational Physics 378 (2019): 686-707.
 
 - Rao, C. P., H. Sun, and Y. Liu. "[Physics-Informed Deep Learning for Incompressible Laminar Flows.](https://www.sciencedirect.com/science/article/pii/S2095034920300350)" Theoretical and Applied Mechanics Letters 10.3 (2020): 207-12.
+
+- "비압축성 유체 정보 기반 신경망 (Incompressible NS-Informed Neural Network)", Deep Campus, 2021.11.02, https://pasus.tistory.com/166 (*Written in Korean) 
