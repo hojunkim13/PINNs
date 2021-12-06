@@ -26,7 +26,7 @@ with torch.no_grad():
 
 fig, ax = plt.subplots()
 ax.set_xlabel("$x$")
-ax.set_xlabel("$u$")
+ax.set_ylabel("$u$")
 ax.set_xlim([x_min - 0.1, x_max + 0.1])
 ax.set_ylim([u_pred.min() - 0.1, u_pred.max() + 0.1])
 (line,) = ax.plot([], [], color="k")
