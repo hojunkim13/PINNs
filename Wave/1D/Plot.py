@@ -14,11 +14,11 @@ t = np.arange(t_min, t_max, 0.01)
 
 x_mesh, t_mesh = np.meshgrid(x, t)
 
-x_ = x_mesh.reshape((-1, 1))
-t_ = t_mesh.reshape((-1, 1))
+X = x_mesh.reshape((-1, 1))
+T = t_mesh.reshape((-1, 1))
 
-x_ts = torch.tensor(x_, dtype=torch.float32).to(device)
-t_ts = torch.tensor(t_, dtype=torch.float32).to(device)
+x_ts = torch.tensor(X, dtype=torch.float32).to(device)
+t_ts = torch.tensor(T, dtype=torch.float32).to(device)
 xt_ts = torch.hstack([x_ts, t_ts])
 with torch.no_grad():
     u_pred = pinn.net(xt_ts).cpu().numpy().reshape(t_mesh.shape).T

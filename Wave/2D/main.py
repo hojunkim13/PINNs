@@ -21,17 +21,9 @@ t_max = 1.0
 ub = np.array([x_max, y_max, t_max])
 lb = np.array([x_min, y_min, t_min])
 
-N_ic = 50
-N_bc = 50
+N_0 = 100
+N_bc = 100
 N_f = 20000
-
-
-def normalize(xyt):
-    xyt = xyt.clone()
-    lb = torch.tensor([x_min, y_min, t_min], dtype=torch.float).to(device)
-    ub = torch.tensor([x_max, y_max, t_max], dtype=torch.float).to(device)
-    xyt = (xyt - lb) / (ub - lb)
-    return xyt
 
 
 ########
@@ -42,12 +34,13 @@ y_points = lambda n: np.random.uniform(y_min, y_max, (n, 1))
 t_points = lambda n: np.random.uniform(t_min, t_max, (n, 1))
 
 # IC
-x_ic = x_points(N_ic)
-y_ic = y_points(N_ic)
-t_ic = np.zeros((N_ic, 1))
-xyt_ic = np.hstack([x_ic, y_ic, t_ic])
+x_0 = x_points(N_0)
+y_0 = y_points(N_0)
+t_0 = np.zeros((N_0, 1))
+xyt_0 = np.hstack([x_0, y_0, t_0])
 
-u_ic = np.sin(2 * np.pi * x_ic) * np.sin(np.pi * y_ic)
+u_0 = np.sin(2 * np.pi * x_0) * np.sin(np.pi * y_0)
+u_t_0 = np.zeros((N_0, 1))
 
 ## BC
 x_bc1 = np.zeros((N_bc, 1))
@@ -82,11 +75,12 @@ x_f = x_min + (x_max - x_min) * lhs(1, N_f)
 y_f = y_min + (y_max - y_min) * lhs(1, N_f)
 t_f = t_min + (t_max - t_min) * lhs(1, N_f)
 xyt_f = np.hstack([x_f, y_f, t_f])
-xyt_f = np.vstack([xyt_f, xyt_bc, xyt_ic])
+xyt_f = np.vstack([xyt_f, xyt_bc, xyt_0])
 
 
-xyt_ic = torch.tensor(xyt_ic, dtype=torch.float32).to(device)
-u_ic = torch.tensor(u_ic, dtype=torch.float32).to(device)
+xyt_0 = torch.tensor(xyt_0, dtype=torch.float32).to(device)
+u_0 = torch.tensor(u_0, dtype=torch.float32).to(device)
+u_t_0 = torch.tensor(u_t_0, dtype=torch.float32).to(device)
 xyt_bc = torch.tensor(xyt_bc, dtype=torch.float32).to(device)
 u_bc = torch.tensor(u_bc, dtype=torch.float32).to(device)
 xyt_f = torch.tensor(xyt_f, dtype=torch.float32).to(device)
@@ -113,56 +107,66 @@ class PINN:
         self.losses = {"ic": [], "bc": [], "pde": []}
         self.adam = torch.optim.Adam(self.net.parameters(), lr=1e-3)
 
-    def u(self, xyt):
-        return self.net(normalize(xyt))
+    def loss_ic(self, xyt):
+        xyt = xyt.clone()
+        xyt.requires_grad = True
 
-    def f(self, xyt):
-        g = xyt.clone()
-        g.requires_grad = True
+        u = self.net(xyt)
+        u_t = grad(u.sum(), xyt, create_graph=True)[0][:, 2:3]
 
-        u = self.u(g)
+        mse_0 = torch.mean(torch.square(u - u_0)) + torch.mean(
+            torch.square(u_t - u_t_0)
+        )
+        return mse_0
 
-        u_xyt = grad(u.sum(), g, create_graph=True)[0]
-        u_xx = grad(u_xyt[:, 0:1].sum(), g, create_graph=True)[0][:, 0:1]
-        u_yy = grad(u_xyt[:, 1:2].sum(), g, create_graph=True)[0][:, 1:2]
-        u_tt = grad(u_xyt[:, 2:3].sum(), g, create_graph=True)[0][:, 2:3]
-        f = u_tt - (self.c ** 2) * (u_xx + u_yy)
-        return f
+    def loss_bc(self, xyt):
+        u = self.net(xyt)
+        mse_bc = torch.mean(torch.square(u - u_bc))
+        return mse_bc
+
+    def loss_pde(self, xyt):
+        xyt = xyt.clone()
+        xyt.requires_grad = True
+
+        u = self.net(xyt)
+
+        u_xyt = grad(u.sum(), xyt, create_graph=True)[0]
+        u_xx = grad(u_xyt[:, 0:1].sum(), xyt, create_graph=True)[0][:, 0:1]
+        u_yy = grad(u_xyt[:, 1:2].sum(), xyt, create_graph=True)[0][:, 1:2]
+        u_tt = grad(u_xyt[:, 2:3].sum(), xyt, create_graph=True)[0][:, 2:3]
+        pde = u_tt - (self.c ** 2) * (u_xx + u_yy)
+
+        mse_pde = torch.mean(torch.square(pde))
+        return mse_pde
 
     def closure(self):
         self.optimizer.zero_grad()
         self.adam.zero_grad()
 
-        u_ic_pred = self.u(xyt_ic)
-        mse_ic = torch.mean(torch.square(u_ic_pred - u_ic))
+        mse_0 = self.loss_ic(xyt_0)
+        mse_bc = self.loss_bc(xyt_bc)
+        mse_pde = self.loss_pde(xyt_f)
 
-        u_bc_pred = self.u(xyt_bc)
-        mse_bc = torch.mean(torch.square(u_bc_pred - u_bc))
-
-        f_pred = self.f(xyt_f)
-        mse_f = torch.mean(torch.square(f_pred))
-
-        loss = mse_ic + mse_bc + mse_f
+        loss = mse_0 + mse_bc + mse_pde
 
         loss.backward()
 
-        self.losses["ic"].append(mse_ic.detach().cpu().item())
+        self.losses["ic"].append(mse_0.detach().cpu().item())
         self.losses["bc"].append(mse_bc.detach().cpu().item())
-        self.losses["pde"].append(mse_f.detach().cpu().item())
+        self.losses["pde"].append(mse_pde.detach().cpu().item())
         self.iter += 1
         print(
-            f"\r{self.iter} Loss: {loss.item():.5e} IC: {mse_ic.item():.3e} BC: {mse_bc.item():.3e} pde: {mse_f.item():.3e}",
+            f"\r{self.iter} Loss: {loss.item():.5e} IC: {mse_0.item():.3e} BC: {mse_bc.item():.3e} pde: {mse_pde.item():.3e}",
             end="",
         )
         if self.iter % 500 == 0:
             print("")
-
         return loss
 
 
 if __name__ == "__main__":
     pinn = PINN()
-    for i in range(5000):
+    for i in range(10000):
         pinn.closure()
         pinn.adam.step()
     pinn.optimizer.step(pinn.closure)

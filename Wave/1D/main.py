@@ -23,10 +23,11 @@ N_f = 10000
 
 
 ## IC , u(x,0) = 0
-x_ic = np.random.uniform(x_min, x_max, (N_u, 1))
-t_ic = np.zeros((N_u, 1))
-xt_ic = np.hstack([x_ic, t_ic])
-u_ic = np.zeros((N_u, 1))
+x_0 = np.random.uniform(x_min, x_max, (N_u, 1))
+t_0 = np.zeros((N_u, 1))
+xt_0 = np.hstack([x_0, t_0])
+u_0 = np.zeros((N_u, 1))
+u_t_0 = np.zeros((N_u, 1))
 
 # BC : Controlled end points, u(x,0) = sin(2pi * t * freq), u(x, L) = 0
 x_bc1 = np.zeros((N_u, 1))
@@ -45,12 +46,13 @@ u_bc = np.vstack((u_bc1, u_bc2))
 # collocation points
 x_f = x_min + (x_max - x_min) * lhs(1, N_f)
 t_f = t_min + (t_max - t_min) * lhs(1, N_f)
-x_f = np.vstack([x_ic, x_bc, x_f])
-t_f = np.vstack([t_ic, t_bc, t_f])
+x_f = np.vstack([x_0, x_bc, x_f])
+t_f = np.vstack([t_0, t_bc, t_f])
 
 
-xt_ic = torch.tensor(xt_ic, dtype=torch.float32).to(device)
-u_ic = torch.tensor(u_ic, dtype=torch.float32).to(device)
+xt_0 = torch.tensor(xt_0, dtype=torch.float32).to(device)
+u_0 = torch.tensor(u_0, dtype=torch.float32).to(device)
+u_t_0 = torch.tensor(u_t_0, dtype=torch.float32).to(device)
 
 xt_bc = torch.tensor(xt_bc, dtype=torch.float32).to(device)
 u_bc = torch.tensor(u_bc, dtype=torch.float32).to(device)
@@ -80,7 +82,21 @@ class PINN:
         self.ms = lambda x: torch.mean(torch.square(x))
         self.iter = 0
 
-    def f(self, xt):
+    def loss_ic(self, xt):
+        xt = xt.clone()
+        xt.requires_grad = True
+        u = self.net(xt)
+
+        u_t = grad(u.sum(), xt, create_graph=True)[0][:, 1:2]
+        mse_0 = self.ms(u - u_0) + self.ms(u_t - u_t_0)
+        return mse_0
+
+    def loss_bc(self, xt):
+        u = self.net(xt)
+        mse_bc = self.ms(u - u_bc)
+        return mse_bc
+
+    def loss_pde(self, xt):
         xt = xt.clone()
         xt.requires_grad = True
         u = self.net(xt)
@@ -92,30 +108,24 @@ class PINN:
         u_t = u_xt[:, 1:2]
         u_tt = grad(u_t.sum(), xt, create_graph=True)[0][:, 1:2]
 
-        f = u_tt - (self.c ** 2) * (u_xx)
-        return f
+        pde = u_tt - (self.c ** 2) * (u_xx)
+        mse_pde = self.ms(pde)
+        return mse_pde
 
     def closure(self):
         self.optimizer.zero_grad()
-        # IC
-        u_pred_ic = self.net(xt_ic)
-        mse_u_ic = self.ms(u_pred_ic - u_ic)
 
-        # BC
-        u_pred_bc = self.net(xt_bc)
-        mse_u_bc = self.ms(u_pred_bc - u_bc)
-
-        mse_u = mse_u_ic + mse_u_bc
+        mse_0 = self.loss_ic(xt_0)
+        mse_bc = self.loss_bc(xt_bc)
+        mse_pde = self.loss_pde(xt_f)
 
         # collocation points
-        f = self.f(xt_f)
-        mse_f = self.ms(f)
-        loss = mse_u + mse_f
+        loss = mse_0 + mse_bc + mse_pde
 
         loss.backward()
         self.iter += 1
         print(
-            f"\r{self.iter}, Loss : {loss.item():.5e}, ic : {mse_u_ic:.3e}, bc : {mse_u_bc:.3e}, f : {mse_f:.3e}",
+            f"\r{self.iter}, Loss : {loss.item():.5e}, ic : {mse_0:.3e}, bc : {mse_bc:.3e}, f : {mse_pde:.3e}",
             end="",
         )
         if self.iter % 500 == 0:
