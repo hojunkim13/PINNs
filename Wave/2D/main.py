@@ -21,8 +21,8 @@ t_max = 1.0
 ub = np.array([x_max, y_max, t_max])
 lb = np.array([x_min, y_min, t_min])
 
-N_0 = 100
-N_bc = 100
+N_0 = 200
+N_bc = 200
 N_f = 20000
 
 
@@ -104,8 +104,8 @@ class PINN:
             tolerance_change=1.0 * np.finfo(float).eps,
             line_search_fn="strong_wolfe",
         )
+        self.adam = torch.optim.Adam(self.net.parameters(), lr=5e-4)
         self.losses = {"ic": [], "bc": [], "pde": []}
-        self.adam = torch.optim.Adam(self.net.parameters(), lr=1e-3)
 
     def loss_ic(self, xyt):
         xyt = xyt.clone()
