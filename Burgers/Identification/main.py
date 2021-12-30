@@ -3,7 +3,7 @@ import sys
 sys.path.append(".")
 import numpy as np
 import torch
-from torch.autograd import grad, Variable
+from torch.autograd import grad
 from network import DNN
 from scipy.io import loadmat
 
@@ -36,6 +36,7 @@ rand_idx = np.random.choice(len(u_), N_u, replace=False)
 
 x = torch.tensor(x_[rand_idx], dtype=torch.float32).to(device)
 t = torch.tensor(t_[rand_idx], dtype=torch.float32).to(device)
+xt = torch.cat((x, t), dim=1)
 u = torch.tensor(u_[rand_idx], dtype=torch.float32).to(device)
 
 # 1% Noisy Data Preparation
@@ -69,17 +70,19 @@ class PINN:
         )
         self.iter = 0
 
-    def f(self, x, t):
+    def f(self, xt):
         lambda_1 = self.lambda_1
         lambda_2 = torch.exp(self.lambda_2)
+        xt = xt.clone()
+        xt.requires_grad = True
 
-        x = Variable(x, requires_grad=True).to(device)
-        t = Variable(t, requires_grad=True).to(device)
-        u = self.net(torch.cat((x, t), dim=1))
+        u = self.net(xt)
 
-        u_t = grad(u.sum(), t, create_graph=True)[0]
-        u_x = grad(u.sum(), x, create_graph=True)[0]
-        u_xx = grad(u_x.sum(), x, create_graph=True)[0]
+        u_xt = grad(u.sum(), xt, create_graph=True)[0]
+        u_x = u_xt[:, 0:1]
+        u_t = u_xt[:, 1:2]
+
+        u_xx = grad(u_x.sum(), xt, create_graph=True)[0][:, 0:1]
 
         f = u_t + lambda_1 * u * u_x - lambda_2 * u_xx
         return f
@@ -87,8 +90,8 @@ class PINN:
     def closure(self):
         self.optimizer.zero_grad()
 
-        u_pred = self.net(torch.cat((x, t), dim=1))
-        f_pred = self.f(x, t)
+        u_pred = self.net(xt)
+        f_pred = self.f(xt)
 
         mse_u = torch.mean(torch.square(u_pred - self.u))
         mse_f = torch.mean(torch.square(f_pred))

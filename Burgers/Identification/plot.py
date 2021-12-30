@@ -6,15 +6,15 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.gridspec import GridSpec
 from scipy.io import loadmat
 
-pgf_with_latex = {  # setup matplotlib to use latex for output
-    "text.usetex": True,  # use LaTeX to write all text
+pgf_with_latex = {
+    "text.usetex": True,
     "font.family": "serif",
-    "font.serif": [],  # blank entries should cause plots to inherit fonts from the document
+    "font.serif": [],
     "font.sans-serif": [],
     "font.monospace": [],
-    "axes.labelsize": 10,  # LaTeX default is 10pt font.
+    "axes.labelsize": 10,
     "font.size": 10,
-    "legend.fontsize": 8,  # Make the legend/label fonts a little smaller
+    "legend.fontsize": 8,
     "xtick.labelsize": 8,
     "ytick.labelsize": 8,
 }
