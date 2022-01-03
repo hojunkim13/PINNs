@@ -5,7 +5,6 @@
 Viscosity of fluid : $\mu = 0.02kg \cdot (m \cdot sec)^{-1}$
 Densitoy if fluid : $\rho = 1kg \cdot m^{3}$  
 
-
 $$
 \begin{aligned}
 \tag{@\ Inlet}
