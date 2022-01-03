@@ -126,22 +126,21 @@ class PINN:
         return u, v, p, sig_xx, sig_xy, sig_yy
 
     def bc_loss(self, xy):
-        # inlet & wall loss & cylinder
-        out = self.net(xy)
-        uv = out[:, 0:2]
-        mse_bc = torch.mean(torch.square(uv - uv_bnd), dim=0)
-        return mse_bc.sum()
+        u, v = self.predict(xy)[0:2]
+        mse_bc = torch.mean(torch.square(u - uv_bnd[:, 0:1])) + torch.mean(
+            torch.square(v - uv_bnd[:, 1:2])
+        )
+        return mse_bc
 
     def outlet_loss(self, xy):
         out = self.net(xy)
-        p = out[:, 2:3]
+        p = out[:, 1:2]
         mse_outlet = torch.mean(torch.square(p))
         return mse_outlet
 
     def pde_loss(self, xy):
         xy = xy.clone()
         xy.requires_grad = True
-
         u, v, p, sig_xx, sig_xy, sig_yy = self.predict(xy)
 
         u_out = grad(u.sum(), xy, create_graph=True)[0]
