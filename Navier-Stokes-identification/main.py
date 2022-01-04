@@ -12,8 +12,8 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 N_train = 5000
 
 data = loadmat("./Navier-Stokes-identification/cylinder_nektar_wake.mat")
-u = data["U_star"][:, 0, :]  # N x T
-v = data["U_star"][:, 1, :]  # N x T
+u = data["U_star"][:, 0]  # N x T
+v = data["U_star"][:, 1]  # N x T
 p = data["p_star"]  # N x T
 
 x = data["X_star"][:, 0:1]  # N x 1
@@ -23,9 +23,9 @@ t = data["t"]  # 200 x 1
 ub = np.array([x.max(), y.max(), t.max()])
 lb = np.array([x.min(), y.min(), t.min()])
 
-x_ = np.tile(x, (1, len(t)))
-y_ = np.tile(y, (1, len(t)))
-t_ = np.tile(t, (1, N_train)).T
+x_ = np.tile(x, len(t))
+y_ = np.tile(y, len(t))
+t_ = np.tile(t, N_train).T
 
 x_ = x_.flatten()[:, None]
 y_ = y_.flatten()[:, None]
