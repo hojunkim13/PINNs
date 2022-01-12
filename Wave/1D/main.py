@@ -11,44 +11,35 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # Parameters
 x_min = 0
-x_max = 1
+x_max = 2
 t_min = 0
-t_max = 1
+t_max = 5
 
 ub = np.array([x_max, t_max])
 lb = np.array([x_min, t_min])
 
-N_u = 50
+N_0 = 100
+N_bc = 300
 N_f = 10000
 
-
 ## IC , u(x,0) = 0
-x_0 = np.random.uniform(x_min, x_max, (N_u, 1))
-t_0 = np.zeros((N_u, 1))
+x_0 = np.random.uniform(x_min, x_max, (N_0, 1))
+t_0 = np.zeros((N_0, 1))
 xt_0 = np.hstack([x_0, t_0])
-u_0 = np.zeros((N_u, 1))
-u_t_0 = np.zeros((N_u, 1))
+u_0 = np.where(x_0 < 1, x_0 / 2, 1 - x_0 / 2)
+u_t_0 = np.zeros((N_0, 1))
 
-# BC : Controlled end points, u(x,0) = sin(2pi * t * freq), u(x, L) = 0
-x_bc1 = np.zeros((N_u, 1))
-t_bc1 = np.random.uniform(t_min, t_max, (N_u, 1))
-u_bc1 = np.sin(2 * np.pi * t_bc1 * 2)
-
-x_bc2 = np.ones((N_u, 1)) * x_max
-t_bc2 = np.random.uniform(t_min, t_max, (N_u, 1))
-u_bc2 = np.zeros((N_u, 1))
-
-x_bc = np.vstack([x_bc1, x_bc2])
-t_bc = np.vstack([t_bc1, t_bc2])
+# BC : Fixed end points
+x_bc = np.random.choice([x_min, x_max], size=(N_bc, 1))
+t_bc = np.random.uniform(t_min, t_max, (N_bc, 1))
 xt_bc = np.hstack([x_bc, t_bc])
-u_bc = np.vstack((u_bc1, u_bc2))
+u_bc = np.zeros((N_bc, 1))
 
 # collocation points
 x_f = x_min + (x_max - x_min) * lhs(1, N_f)
 t_f = t_min + (t_max - t_min) * lhs(1, N_f)
 x_f = np.vstack([x_0, x_bc, x_f])
 t_f = np.vstack([t_0, t_bc, t_f])
-
 
 xt_0 = torch.tensor(xt_0, dtype=torch.float32).to(device)
 u_0 = torch.tensor(u_0, dtype=torch.float32).to(device)
@@ -63,13 +54,13 @@ xt_f = torch.hstack([x_f, t_f])
 
 
 class PINN:
-    c = 1
+    c = 1.0
 
     def __init__(self) -> None:
         self.net = DNN(dim_in=2, dim_out=1, n_layer=5, n_node=20, ub=ub, lb=lb).to(
             device
         )
-        self.optimizer = torch.optim.LBFGS(
+        self.lbfgs = torch.optim.LBFGS(
             self.net.parameters(),
             lr=1.0,
             max_iter=50000,
@@ -79,6 +70,7 @@ class PINN:
             tolerance_change=1.0 * np.finfo(float).eps,
             line_search_fn="strong_wolfe",
         )
+        self.adam = torch.optim.Adam(self.net.parameters())
         self.ms = lambda x: torch.mean(torch.square(x))
         self.iter = 0
 
@@ -101,7 +93,7 @@ class PINN:
         xt.requires_grad = True
         u = self.net(xt)
 
-        u_xt = grad(u.sum(), xt, create_graph=True)[0]
+        u_xt = grad(u.sum(), xt, create_graph=True, retain_graph=True)[0]
         u_x = u_xt[:, 0:1]
         u_xx = grad(u_x.sum(), xt, create_graph=True)[0][:, 0:1]
 
@@ -113,8 +105,8 @@ class PINN:
         return mse_pde
 
     def closure(self):
-        self.optimizer.zero_grad()
-
+        self.lbfgs.zero_grad()
+        self.adam.zero_grad()
         mse_0 = self.loss_ic(xt_0)
         mse_bc = self.loss_bc(xt_bc)
         mse_pde = self.loss_pde(xt_f)
@@ -137,5 +129,8 @@ class PINN:
 
 if __name__ == "__main__":
     pinn = PINN()
-    pinn.optimizer.step(pinn.closure)
+    for i in range(5000):
+        pinn.closure()
+        pinn.adam.step()
+    pinn.lbfgs.step(pinn.closure)
     torch.save(pinn.net.state_dict(), "./Wave/1D/weight.pt")

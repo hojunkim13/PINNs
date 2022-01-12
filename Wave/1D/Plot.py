@@ -1,6 +1,7 @@
 import torch
 from main import PINN, x_min, x_max, t_min, t_max
 import numpy as np
+from scipy.interpolate import griddata
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
@@ -22,7 +23,6 @@ t_ts = torch.tensor(T, dtype=torch.float32).to(device)
 xt_ts = torch.hstack([x_ts, t_ts])
 with torch.no_grad():
     u_pred = pinn.net(xt_ts).cpu().numpy().reshape(t_mesh.shape).T
-
 
 fig, ax = plt.subplots()
 ax.set_xlabel("$x$")
