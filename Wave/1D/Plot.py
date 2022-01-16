@@ -1,7 +1,6 @@
 import torch
 from main import PINN, x_min, x_max, t_min, t_max
 import numpy as np
-from scipy.interpolate import griddata
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 

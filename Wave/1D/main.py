@@ -35,12 +35,11 @@ t_bc = np.random.uniform(t_min, t_max, (N_bc, 1))
 xt_bc = np.hstack([x_bc, t_bc])
 u_bc = np.zeros((N_bc, 1))
 
-# collocation points
-x_f = x_min + (x_max - x_min) * lhs(1, N_f)
-t_f = t_min + (t_max - t_min) * lhs(1, N_f)
-x_f = np.vstack([x_0, x_bc, x_f])
-t_f = np.vstack([t_0, t_bc, t_f])
+# Collocation points
+xt_f = np.random.uniform(lb, ub, (N_f, 2))
 
+
+# Convert to tensor
 xt_0 = torch.tensor(xt_0, dtype=torch.float32).to(device)
 u_0 = torch.tensor(u_0, dtype=torch.float32).to(device)
 u_t_0 = torch.tensor(u_t_0, dtype=torch.float32).to(device)
@@ -48,16 +47,14 @@ u_t_0 = torch.tensor(u_t_0, dtype=torch.float32).to(device)
 xt_bc = torch.tensor(xt_bc, dtype=torch.float32).to(device)
 u_bc = torch.tensor(u_bc, dtype=torch.float32).to(device)
 
-x_f = torch.tensor(x_f, dtype=torch.float32).to(device)
-t_f = torch.tensor(t_f, dtype=torch.float32).to(device)
-xt_f = torch.hstack([x_f, t_f])
+xt_f = torch.tensor(xt_f, dtype=torch.float32).to(device)
 
 
 class PINN:
     c = 1.0
 
     def __init__(self) -> None:
-        self.net = DNN(dim_in=2, dim_out=1, n_layer=5, n_node=20, ub=ub, lb=lb).to(
+        self.net = DNN(dim_in=2, dim_out=1, n_layer=5, n_node=40, ub=ub, lb=lb).to(
             device
         )
         self.lbfgs = torch.optim.LBFGS(
