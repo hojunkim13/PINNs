@@ -36,7 +36,9 @@ data = (u, v, p)
 labels = ["$u(x,y)$", "$v(x,y)$", "$p(x,y)$"]
 for i in range(3):
     ax = axes[i]
-    im = ax.imshow(data[i], cmap="rainbow", extent=[x_min, x_max, y_min, y_max])
+    im = ax.imshow(
+        data[i], cmap="rainbow", extent=[x_min, x_max, y_min, y_max], origin="lower"
+    )
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="3%", pad="3%")
     fig.colorbar(im, cax=cax, label=labels[i])
