@@ -56,7 +56,11 @@ gs0.update(top=1 - 0.06, bottom=1 - 1 / 3, left=0.15, right=0.85, wspace=0)
 
 ax = fig.add_subplot(gs0[0, :])
 im = ax.imshow(
-    u_pred, cmap="rainbow", extent=[t_min, t_max, x_min, x_max], aspect="auto"
+    u_pred,
+    cmap="rainbow",
+    extent=[t_min, t_max, x_min, x_max],
+    aspect="auto",
+    origin="lower",
 )
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="3%", pad=0.2)

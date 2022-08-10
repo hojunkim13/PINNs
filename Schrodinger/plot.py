@@ -91,7 +91,10 @@ gs0 = GridSpec(1, 2, figure=fig)
 gs0.update(top=1 - 0.06, bottom=0.66, left=0.15, right=0.85, wspace=0)
 
 ax = fig.add_subplot(gs0[0, :])
-im = ax.imshow(h_pred, cmap="YlGnBu", extent=[0, np.pi / 2, -5, 5], aspect="auto")
+im = ax.imshow(
+    h_pred, cmap="YlGnBu", extent=[0, np.pi / 2, -5, 5], aspect="auto", origin="lower"
+)
+
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="3%", pad=0.2)
 
