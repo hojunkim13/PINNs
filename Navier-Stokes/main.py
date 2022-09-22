@@ -134,7 +134,7 @@ class PINN:
 
     def outlet_loss(self, xy):
         out = self.net(xy)
-        p = out[:, 1:2]
+        p = out[:, 2:3]
         mse_outlet = torch.mean(torch.square(p))
         return mse_outlet
 
